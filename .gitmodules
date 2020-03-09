@@ -1,0 +1,9 @@
+[submodule "deps/litex"]
+	path = deps/litex
+	url = https://github.com/enjoy-digital/litex.git
+[submodule "deps/litex-boards"]
+	path = deps/litex-boards
+	url = https://github.com/litex-hub/litex-boards.git
+[submodule "deps/migen"]
+	path = deps/migen
+	url = https://github.com/m-labs/migen.git
