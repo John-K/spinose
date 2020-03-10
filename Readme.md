@@ -1,6 +1,12 @@
 # SPINose
 SPINose is a quick and dirty gateware for ULX3S to enable dumping  external SPI NOR flash via litex's builtin `mr`  command.
 
+## Requirements
+
+You must have `nextpnr-ecp5`, `yosys`, and `riscv64-unknown-elf-gcc` available in your `$PATH`
+
+SPINose uses `lxbuildenv.py` to manage litex and migen.
+
 ## Building
 To build the firmware and gateware, simply invoke the main python script:
 
