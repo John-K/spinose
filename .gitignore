@@ -1,0 +1,5 @@
+__pycache__/
+soc_basesoc_ulx3s/
+*.dump
+*.bin
+*.bit
