@@ -11,7 +11,7 @@ from litex.build.lattice import LatticePlatform
 
 _io = [
     ("clk25", 0, Pins("G2"), IOStandard("LVCMOS33")),
-    ("rst", 0, Pins("R1"), IOStandard("LVCMOS33")),
+    ("rst",   0, Pins("R1"), IOStandard("LVCMOS33")),
 
     ("user_led", 0, Pins("B2"), IOStandard("LVCMOS33")),
     ("user_led", 1, Pins("C2"), IOStandard("LVCMOS33")),
@@ -34,7 +34,19 @@ _io = [
         Subsignal("rx", Pins("D18"), IOStandard("LVCMOS33"))
     ),
 
-    ("sdram_clock", 0, Pins("F19"), IOStandard("LVCMOS33")),
+    ("spisdcard", 0,
+        Subsignal("clk",  Pins("J1")),
+        Subsignal("mosi", Pins("J3"), Misc("PULLMODE=UP")),
+        Subsignal("cs_n", Pins("H1"), Misc("PULLMODE=UP")),
+        Subsignal("miso", Pins("K2"), Misc("PULLMODE=UP")),
+        Misc("SLEWRATE=FAST"),
+        IOStandard("LVCMOS33")),
+
+    ("sdram_clock", 0, Pins("F19"),
+        Misc("PULLMODE=NONE"),
+        Misc("DRIVE=4"),
+        Misc("SLEWRATE=FAST"),
+        IOStandard("LVCMOS33")),
     ("sdram", 0,
         Subsignal("a", Pins("M20 M19 L20 L19 K20 K19 K18 J20 J19 H20 N19 G20 G19")),
         Subsignal("dq", Pins("J16 L18 M18 N18 P18 T18 T17 U20 E19 D20 D19 C20 E18 F18 J18 J17")),
@@ -45,7 +57,10 @@ _io = [
         Subsignal("cke", Pins("F20")),
         Subsignal("ba", Pins("P19 N20")),
         Subsignal("dm", Pins("U19 E20")),
-        IOStandard("LVCMOS33"), Misc("SLEWRATE=FAST")
+        Misc("PULLMODE=NONE"),
+        Misc("DRIVE=4"),
+        Misc("SLEWRATE=FAST"),
+        IOStandard("LVCMOS33")
     ),
 
     # External SPI Flash data lines connected to J1 Pins GN0 - GN5
