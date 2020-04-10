@@ -22,7 +22,7 @@ _io = [
     ("user_led", 2, Pins("E1"), IOStandard("LVCMOS33")),
     ("user_led", 3, Pins("H3"), IOStandard("LVCMOS33")),
 
-    ("serial", 0,
+    ("dserial", 0,
         # specify alternate serial pinout since we're using the onboard
         # FT231 for JTAG programming and it isn't as capable as FT2232
 
@@ -32,6 +32,13 @@ _io = [
 	# J2 Pins GN20 (tx) and GP20 (rx)
         Subsignal("tx", Pins("E17"), IOStandard("LVCMOS33")),
         Subsignal("rx", Pins("D18"), IOStandard("LVCMOS33"))
+    ),
+
+    ("usb", 0,
+        Subsignal("d_p", Pins("D15")),
+        Subsignal("d_m", Pins("E15")),
+        Subsignal("pullup", Pins("B12")), # C12")),
+        IOStandard("LVCMOS33")
     ),
 
     ("spisdcard", 0,

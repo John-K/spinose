@@ -66,18 +66,19 @@ class _CRG(Module):
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
-class BaseSoC(SoCSDRAM):
+class BaseSoC(SoCCore):
     SPIFLASH_PAGE_SIZE    = 256
     SPIFLASH_SECTOR_SIZE  = 64*1024
     # The dummy cycles comes from section 8.1.3 "Instruction Set Table 2" of the W25Q64FW datasheet
     # which states that FastRead command has one dummy byte. This value should be the same for Quad
     # output (spiflash4x) for this IC.
     SPIFLASH_DUMMY_CYCLES = 8
-    def __init__(self, device="LFE5U-25F", toolchain="trellis", sys_clk_freq=int(50e6), sdram_module_cls="MT48LC16M16", **kwargs):
+    def __init__(self, device="LFE5U-45F", toolchain="trellis",
+        sys_clk_freq=int(50e6), sdram_module_cls="MT48LC16M16", **kwargs):
 
         platform = ulx3s.Platform(device=device, toolchain=toolchain)
         # SoCSDRAM ---------------------------------------------------------------------------------
-        SoCCore.__init__(self, platform, clk_freq=sys_clk_freq, **kwargs)
+        SoCCore.__init__(self, platform, clk_freq=sys_clk_freq, with_uart=False, **kwargs)
 
         # CRG --------------------------------------------------------------------------------------
         self.submodules.crg = _CRG(platform, sys_clk_freq)
@@ -90,6 +91,13 @@ class BaseSoC(SoCSDRAM):
         self.submodules.spiflash = spi_flash.SpiFlash(spi_pads, dummy=self.SPIFLASH_DUMMY_CYCLES, endianness="little")
         self.register_mem("spiflash", 0x20000000, self.spiflash.bus, size=16 * 1024 * 1024)
         self.add_csr("spiflash")
+
+        import valentyusb.usbcore.io as usbio
+        import valentyusb.usbcore.cpu.cdc_eptri as cdc_eptri
+        usb_pads = self.platform.request("usb")
+        usb_iobuf = usbio.IoBuf(usb_pads.d_p, usb_pads.d_n, usb_pads.pullup)
+        self.submodules.uart = cdc_eptri.CDCUsb(usb_iobuf)
+
 
         # SDR SDRAM --------------------------------------------------------------------------------
         if not self.integrated_main_ram_size:
@@ -125,10 +133,10 @@ def main():
     soc_sdram_args(parser)
     trellis_args(parser)
     args = parser.parse_args()
-
+   
     soc = BaseSoC(device=args.device, toolchain=args.toolchain,
-        sys_clk_freq=int(float(args.sys_clk_freq)),
         sdram_module_cls=args.sdram_module,
+        sys_clk_freq=int(float(args.sys_clk_freq)),
         **soc_sdram_argdict(args))
 
     builder = Builder(soc, **builder_argdict(args))
