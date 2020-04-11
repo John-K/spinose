@@ -36,7 +36,7 @@ _io = [
 
     ("usb", 0,
         Subsignal("d_p", Pins("D15")),
-        Subsignal("d_m", Pins("E15")),
+        Subsignal("d_n", Pins("E15")),
         Subsignal("pullup", Pins("B12")), # C12")),
         IOStandard("LVCMOS33")
     ),
