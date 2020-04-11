@@ -21,9 +21,9 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.io import DDROutput
 
-# use our local ulx3s platform
-import ulx3s
+from litex_boards.platforms import ulx3s
 
+from litex.build.generic_platform import *
 from litex.build.lattice.trellis import trellis_args, trellis_argdict
 
 from litex.soc.cores import spi_flash
@@ -83,6 +83,33 @@ class BaseSoC(SoCCore):
         sys_clk_freq=int(48e6), sdram_module_cls="MT48LC16M16", **kwargs):
 
         platform = ulx3s.Platform(device=device, toolchain=toolchain)
+
+        # enable USB on ULX3S
+        platform.add_extension([
+            ("usb", 0,
+                Subsignal("d_p", Pins("D15")),
+                Subsignal("d_n", Pins("E15")),
+                Subsignal("pullup", Pins("B12")),
+                IOStandard("LVCMOS33")
+            )
+        ])
+
+        # add our spiflash
+        platform.add_extension([
+	    # External SPI Flash data lines connected to J1 Pins GN0 - GN5
+	    # WARNING: J1 VREF (R3) must be desoldered when interfacing to
+	    #          1.8v SPI Flash chips. The donor boards 1.8v supply is
+	    #          used as reference instead and is connected to J1 pin 1 (VCC)
+	    ("spiflash", 0,
+		Subsignal("cs_n", Pins("B10")), # GN2
+		Subsignal("clk",  Pins("A8")),  # GN4
+		Subsignal("mosi", Pins("C10")), # GN3
+		Subsignal("miso", Pins("A11")), # GN1
+		Subsignal("wp",   Pins("C11")), # GN0
+		Subsignal("hold", Pins("B8")),  # GN5
+		IOStandard("LVCMOS18")
+	    )
+        ])
 
         # fix for with_uart being defined more than once
         kwargs["with_uart"] = False
