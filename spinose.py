@@ -21,9 +21,9 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.io import DDROutput
 
-# use our local ulx3s platform
-import ulx3s
+from litex_boards.platforms import ulx3s
 
+from litex.build.generic_platform import *
 from litex.build.lattice.trellis import trellis_args, trellis_argdict
 
 from litex.soc.cores import spi_flash
@@ -41,6 +41,8 @@ class _CRG(Module):
     def __init__(self, platform, sys_clk_freq):
         self.clock_domains.cd_sys    = ClockDomain()
         self.clock_domains.cd_sys_ps = ClockDomain(reset_less=True)
+        self.clock_domains.cd_usb_12 = ClockDomain()
+        self.clock_domains.cd_usb_48 = ClockDomain()
 
         # # #
 
@@ -53,8 +55,12 @@ class _CRG(Module):
         self.submodules.pll = pll = ECP5PLL()
         self.comb += pll.reset.eq(rst)
         pll.register_clkin(clk25, 25e6)
-        pll.create_clkout(self.cd_sys,    sys_clk_freq)
-        pll.create_clkout(self.cd_sys_ps, sys_clk_freq, phase=90)
+        pll.create_clkout(self.cd_sys,    sys_clk_freq, margin=0)
+        pll.create_clkout(self.cd_sys_ps, sys_clk_freq, margin=0, phase=90)
+        pll.create_clkout(self.cd_usb_12, 12e6,         margin=0)
+
+        self.comb += self.cd_usb_48.clk.eq(self.cd_sys.clk)
+
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll.locked | rst)
 
         # SDRAM clock
@@ -66,16 +72,47 @@ class _CRG(Module):
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
-class BaseSoC(SoCSDRAM):
+class BaseSoC(SoCCore):
     SPIFLASH_PAGE_SIZE    = 256
     SPIFLASH_SECTOR_SIZE  = 64*1024
     # The dummy cycles comes from section 8.1.3 "Instruction Set Table 2" of the W25Q64FW datasheet
     # which states that FastRead command has one dummy byte. This value should be the same for Quad
     # output (spiflash4x) for this IC.
     SPIFLASH_DUMMY_CYCLES = 8
-    def __init__(self, device="LFE5U-25F", toolchain="trellis", sys_clk_freq=int(50e6), sdram_module_cls="MT48LC16M16", **kwargs):
+    def __init__(self, device="LFE5U-45F", toolchain="trellis",
+        sys_clk_freq=int(48e6), sdram_module_cls="MT48LC16M16", **kwargs):
 
         platform = ulx3s.Platform(device=device, toolchain=toolchain)
+
+        # enable USB on ULX3S
+        platform.add_extension([
+            ("usb", 0,
+                Subsignal("d_p", Pins("D15")),
+                Subsignal("d_n", Pins("E15")),
+                Subsignal("pullup", Pins("B12")),
+                IOStandard("LVCMOS33")
+            )
+        ])
+
+        # add our spiflash
+        platform.add_extension([
+	    # External SPI Flash data lines connected to J1 Pins GN0 - GN5
+	    # WARNING: J1 VREF (R3) must be desoldered when interfacing to
+	    #          1.8v SPI Flash chips. The donor boards 1.8v supply is
+	    #          used as reference instead and is connected to J1 pin 1 (VCC)
+	    ("spiflash", 0,
+		Subsignal("cs_n", Pins("B10")), # GN2
+		Subsignal("clk",  Pins("A8")),  # GN4
+		Subsignal("mosi", Pins("C10")), # GN3
+		Subsignal("miso", Pins("A11")), # GN1
+		Subsignal("wp",   Pins("C11")), # GN0
+		Subsignal("hold", Pins("B8")),  # GN5
+		IOStandard("LVCMOS18")
+	    )
+        ])
+
+        # fix for with_uart being defined more than once
+        kwargs["with_uart"] = False
         # SoCSDRAM ---------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, clk_freq=sys_clk_freq, **kwargs)
 
@@ -90,6 +127,14 @@ class BaseSoC(SoCSDRAM):
         self.submodules.spiflash = spi_flash.SpiFlash(spi_pads, dummy=self.SPIFLASH_DUMMY_CYCLES, endianness="little")
         self.register_mem("spiflash", 0x20000000, self.spiflash.bus, size=16 * 1024 * 1024)
         self.add_csr("spiflash")
+
+        import valentyusb.usbcore.io as usbio
+        import valentyusb.usbcore.cpu.cdc_eptri as cdc_eptri
+        usb_pads = self.platform.request("usb")
+        usb_iobuf = usbio.IoBuf(usb_pads.d_p, usb_pads.d_n, usb_pads.pullup)
+        self.submodules.uart = cdc_eptri.CDCUsb(usb_iobuf, vid=0x1209, pid=0x5835, product="ulx3s CDC", manufacturer="hedge")
+        self.add_csr('uart')
+        self.add_interrupt('uart')
 
         # SDR SDRAM --------------------------------------------------------------------------------
         if not self.integrated_main_ram_size:
@@ -115,7 +160,7 @@ def main():
         help="gateware toolchain to use, trellis (default) or diamond")
     parser.add_argument("--device", dest="device", default="LFE5U-25F",
         help="FPGA device, ULX3S can be populated with LFE5U-45F (default) or LFE5U-85F")
-    parser.add_argument("--sys-clk-freq", default=50e6,
+    parser.add_argument("--sys-clk-freq", default=48e6,
                         help="system clock frequency (default=50MHz)")
     parser.add_argument("--sdram-module", default="MT48LC16M16",
                         help="SDRAM module: MT48LC16M16, AS4C32M16 or AS4C16M16 (default=MT48LC16M16)")
@@ -125,10 +170,10 @@ def main():
     soc_sdram_args(parser)
     trellis_args(parser)
     args = parser.parse_args()
-
+   
     soc = BaseSoC(device=args.device, toolchain=args.toolchain,
-        sys_clk_freq=int(float(args.sys_clk_freq)),
         sdram_module_cls=args.sdram_module,
+        sys_clk_freq=int(float(args.sys_clk_freq)),
         **soc_sdram_argdict(args))
 
     builder = Builder(soc, **builder_argdict(args))

@@ -10,3 +10,7 @@
 [submodule "deps/litedram"]
 	path = deps/litedram
 	url = https://github.com/enjoy-digital/litedram.git
+[submodule "deps/valentyusb"]
+	path = deps/valentyusb
+	url = https://github.com/gregdavill/valentyusb
+	branch = hw_cdc_eptri
